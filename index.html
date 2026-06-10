@@ -11,17 +11,32 @@
 </head>
 <body>
 
-  <iframe src="https://form.jotform.com/261605885042054"></iframe>
+  <iframe id="formulario" src="https://form.jotform.com/261605885042054"></iframe>
 
   <script>
+    // Detecta quando a janela perde foco (funciona mesmo com iframe em foco)
+    window.addEventListener("blur", function () {
+      sessionStorage.setItem("saiu_aba", "true");
+    });
+
+    // Detecta troca de aba também
     document.addEventListener("visibilitychange", function () {
       if (document.visibilityState === "hidden") {
         sessionStorage.setItem("saiu_aba", "true");
       }
     });
 
-    window.addEventListener("load", function () {
+    // Ao voltar para a página, verifica se saiu
+    window.addEventListener("focus", verificar);
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible") {
+        verificar();
+      }
+    });
+
+    function verificar() {
       if (sessionStorage.getItem("saiu_aba") === "true") {
+        sessionStorage.removeItem("saiu_aba");
         document.body.innerHTML = `
           <div style="
             display:flex; flex-direction:column; align-items:center;
@@ -37,9 +52,16 @@
             </p>
           </div>
         `;
-        sessionStorage.removeItem("saiu_aba");
       }
-    });
+    }
+
+    // Força o foco voltar para a janela principal periodicamente
+    // para garantir que o blur do iframe seja detectado
+    setInterval(function () {
+      if (document.activeElement && document.activeElement.tagName === "IFRAME") {
+        // iframe está em foco, ok
+      }
+    }, 500);
   </script>
 
 </body>
