@@ -2,67 +2,466 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Avaliação de Conhecimento</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avaliação de Conhecimento – ACE Soluções Contábeis</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: sans-serif; background: #f5f5f5; }
-    iframe { width: 100%; height: 100vh; border: none; display: block; }
+
+    :root {
+      --navy:   #0D1B4B;
+      --blue:   #1A5CB5;
+      --green:  #5AE620;
+      --green-dark: #3db012;
+      --light:  #F4F7FC;
+      --gray:   #6B7280;
+      --white:  #FFFFFF;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--light);
+      color: var(--navy);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--navy);
+      padding: 18px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 12px rgba(13,27,75,0.18);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-area img {
+      height: 48px;
+      /* logo tem fundo branco, então adicionamos padding e bg arredondado */
+      background: #fff;
+      border-radius: 8px;
+      padding: 4px 10px;
+    }
+
+    .header-title {
+      border-left: 2px solid var(--green);
+      padding-left: 14px;
+    }
+
+    .header-title span {
+      display: block;
+      color: var(--white);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      opacity: 0.7;
+    }
+
+    .header-title strong {
+      display: block;
+      color: var(--white);
+      font-size: 16px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .header-badge {
+      background: rgba(90,230,32,0.15);
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      text-transform: uppercase;
+    }
+
+    /* ── INSTRUCOES ── */
+    .instrucoes-wrap {
+      max-width: 860px;
+      margin: 36px auto 0;
+      padding: 0 24px;
+      width: 100%;
+    }
+
+    .instrucoes-card {
+      background: var(--white);
+      border-radius: 14px;
+      box-shadow: 0 2px 16px rgba(13,27,75,0.07);
+      overflow: hidden;
+    }
+
+    .instrucoes-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+      padding: 24px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .instrucoes-header .icon {
+      width: 46px;
+      height: 46px;
+      background: rgba(90,230,32,0.18);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .instrucoes-header h2 {
+      color: var(--white);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .instrucoes-header p {
+      color: rgba(255,255,255,0.7);
+      font-size: 13px;
+      margin-top: 2px;
+    }
+
+    .instrucoes-body {
+      padding: 28px 32px;
+    }
+
+    .regras-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 600px) {
+      .regras-grid { grid-template-columns: 1fr; }
+      header { padding: 14px 20px; }
+      .instrucoes-wrap { margin-top: 20px; padding: 0 14px; }
+      .instrucoes-body { padding: 20px 18px; }
+      .instrucoes-header { padding: 18px 20px; }
+      .header-badge { display: none; }
+    }
+
+    .regra-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: var(--light);
+      border-left: 3px solid var(--blue);
+    }
+
+    .regra-item.destaque {
+      border-left-color: var(--green-dark);
+      background: #f0fde8;
+    }
+
+    .regra-item .ri {
+      font-size: 20px;
+      margin-top: 1px;
+      flex-shrink: 0;
+    }
+
+    .regra-item p {
+      font-size: 13.5px;
+      color: var(--navy);
+      line-height: 1.5;
+    }
+
+    .regra-item p strong {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .aviso-strip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #fff8e1;
+      border: 1px solid #f0c040;
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+    }
+
+    .aviso-strip span { font-size: 20px; }
+
+    .aviso-strip p {
+      font-size: 13px;
+      color: #7a5800;
+      line-height: 1.5;
+    }
+
+    .btn-iniciar {
+      display: block;
+      width: 100%;
+      background: linear-gradient(135deg, var(--blue) 0%, var(--navy) 100%);
+      color: var(--white);
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 16px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+      text-align: center;
+    }
+
+    .btn-iniciar:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+    }
+
+    .btn-iniciar::after {
+      content: " →";
+    }
+
+    /* ── FORMULARIO ── */
+    #secao-formulario {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+    }
+
+    .form-header-bar {
+      background: var(--navy);
+      color: var(--white);
+      padding: 10px 40px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .form-header-bar .dot {
+      width: 8px; height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      display: inline-block;
+      animation: pulse 1.4s infinite;
+    }
+
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.35; }
+    }
+
+    iframe#formulario {
+      width: 100%;
+      flex: 1;
+      border: none;
+      display: block;
+      min-height: calc(100vh - 120px);
+    }
+
+    /* ── ENCERRADA ── */
+    #secao-encerrada {
+      display: none;
+      flex: 1;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .encerrada-card {
+      background: var(--white);
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(13,27,75,0.10);
+      padding: 48px 40px;
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .encerrada-card .enc-icon {
+      font-size: 56px;
+      margin-bottom: 16px;
+    }
+
+    .encerrada-card h2 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #c0392b;
+      margin-bottom: 12px;
+    }
+
+    .encerrada-card p {
+      font-size: 14px;
+      color: var(--gray);
+      line-height: 1.7;
+    }
+
+    .enc-divider {
+      width: 48px; height: 3px;
+      background: var(--green);
+      border-radius: 2px;
+      margin: 20px auto;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--navy);
+      color: rgba(255,255,255,0.45);
+      text-align: center;
+      font-size: 11.5px;
+      padding: 14px 20px;
+      letter-spacing: 0.3px;
+    }
+
+    footer strong { color: rgba(255,255,255,0.75); }
   </style>
 </head>
 <body>
 
-  <iframe id="formulario" src="https://form.jotform.com/261605885042054"></iframe>
+  <!-- HEADER -->
+  <header>
+    <div class="logo-area">
+      <img src="https://raw.githubusercontent.com/seu-repositorio/logo_png.png" alt="ACE Soluções Contábeis"
+           onerror="this.style.display='none'">
+      <div class="header-title">
+        <span>ACE Soluções Contábeis</span>
+        <strong>Portal de Avaliações</strong>
+      </div>
+    </div>
+    <div class="header-badge">Avaliação Mensal</div>
+  </header>
+
+  <!-- INSTRUÇÕES -->
+  <div class="instrucoes-wrap" id="secao-instrucoes">
+    <div class="instrucoes-card">
+      <div class="instrucoes-header">
+        <div class="icon">📋</div>
+        <div>
+          <h2>Avaliação de Conhecimento — Cursos Mensais</h2>
+          <p>Leia atentamente as instruções antes de iniciar</p>
+        </div>
+      </div>
+
+      <div class="instrucoes-body">
+        <div class="regras-grid">
+          <div class="regra-item">
+            <span class="ri">🎯</span>
+            <p><strong>Objetivo</strong>Avaliar o aproveitamento dos cursos realizados no mês pelos colaboradores.</p>
+          </div>
+          <div class="regra-item">
+            <span class="ri">⏱️</span>
+            <p><strong>Tempo</strong>Responda com calma. Não há tempo limite, mas mantenha o foco durante toda a avaliação.</p>
+          </div>
+          <div class="regra-item destaque">
+            <span class="ri">🚫</span>
+            <p><strong>Não saia da página</strong>Trocar de aba ou minimizar o navegador encerrará automaticamente a avaliação.</p>
+          </div>
+          <div class="regra-item">
+            <span class="ri">📵</span>
+            <p><strong>Sem consultas</strong>A avaliação deve ser realizada sem auxílio de materiais ou terceiros.</p>
+          </div>
+          <div class="regra-item">
+            <span class="ri">✅</span>
+            <p><strong>Envio único</strong>Ao finalizar, clique em enviar. Não será possível alterar as respostas depois.</p>
+          </div>
+          <div class="regra-item">
+            <span class="ri">🔒</span>
+            <p><strong>Integridade</strong>Os resultados são individuais e serão analisados pelo RH.</p>
+          </div>
+        </div>
+
+        <div class="aviso-strip">
+          <span>⚠️</span>
+          <p><strong>Atenção:</strong> Em caso de encerramento indevido, entre em contato com o responsável do setor para solicitar uma nova tentativa.</p>
+        </div>
+
+        <button class="btn-iniciar" onclick="iniciarAvaliacao()">Iniciar Avaliação</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FORMULÁRIO -->
+  <div id="secao-formulario" style="display:none; flex:1; flex-direction:column;">
+    <div class="form-header-bar">
+      <span class="dot"></span>
+      Avaliação em andamento — não feche ou troque de aba
+    </div>
+    <iframe id="formulario" src="about:blank"></iframe>
+  </div>
+
+  <!-- ENCERRADA -->
+  <div id="secao-encerrada" style="display:none; flex:1; align-items:center; justify-content:center; padding:40px 20px;">
+    <div class="encerrada-card">
+      <div class="enc-icon">🚫</div>
+      <h2>Avaliação Encerrada</h2>
+      <div class="enc-divider"></div>
+      <p>
+        Você saiu da página durante a avaliação.<br>
+        Por questões de integridade, sua tentativa foi encerrada.<br><br>
+        Entre em contato com o responsável do setor para solicitar uma nova tentativa.
+      </p>
+    </div>
+  </div>
+
+  <footer>
+    &copy; <strong>ACE Soluções Contábeis</strong> — Sistema de Avaliação Interna
+  </footer>
 
   <script>
-    // Detecta quando a janela perde foco (funciona mesmo com iframe em foco)
+    var avaliacaoAtiva = false;
+
+    function iniciarAvaliacao() {
+      // Carrega o iframe só quando o usuário clica
+      document.getElementById('formulario').src = 'https://form.jotform.com/261605885042054';
+
+      document.getElementById('secao-instrucoes').style.display = 'none';
+
+      var sf = document.getElementById('secao-formulario');
+      sf.style.display = 'flex';
+
+      avaliacaoAtiva = true;
+    }
+
+    // Detecta saída de foco / troca de aba
     window.addEventListener("blur", function () {
-      sessionStorage.setItem("saiu_aba", "true");
+      if (avaliacaoAtiva) sessionStorage.setItem("saiu_aba", "true");
     });
 
-    // Detecta troca de aba também
     document.addEventListener("visibilitychange", function () {
-      if (document.visibilityState === "hidden") {
+      if (document.visibilityState === "hidden" && avaliacaoAtiva) {
         sessionStorage.setItem("saiu_aba", "true");
       }
     });
 
-    // Ao voltar para a página, verifica se saiu
     window.addEventListener("focus", verificar);
     document.addEventListener("visibilitychange", function () {
-      if (document.visibilityState === "visible") {
-        verificar();
-      }
+      if (document.visibilityState === "visible") verificar();
     });
 
     function verificar() {
-      if (sessionStorage.getItem("saiu_aba") === "true") {
+      if (avaliacaoAtiva && sessionStorage.getItem("saiu_aba") === "true") {
         sessionStorage.removeItem("saiu_aba");
-        document.body.innerHTML = `
-          <div style="
-            display:flex; flex-direction:column; align-items:center;
-            justify-content:center; height:100vh; font-family:sans-serif;
-            background:#fff; text-align:center; padding:20px;
-          ">
-            <div style="font-size:60px;">🚫</div>
-            <h2 style="color:#c0392b;">Avaliação Encerrada</h2>
-            <p style="color:#555; max-width:400px;">
-              Você saiu da página durante a avaliação.<br>
-              Por questões de integridade, sua tentativa foi encerrada.<br><br>
-              Entre em contato com o responsável para uma nova tentativa.
-            </p>
-          </div>
-        `;
+        avaliacaoAtiva = false;
+
+        document.getElementById('secao-formulario').style.display = 'none';
+
+        var se = document.getElementById('secao-encerrada');
+        se.style.display = 'flex';
       }
     }
-
-    // Força o foco voltar para a janela principal periodicamente
-    // para garantir que o blur do iframe seja detectado
-    setInterval(function () {
-      if (document.activeElement && document.activeElement.tagName === "IFRAME") {
-        // iframe está em foco, ok
-      }
-    }, 500);
   </script>
-
 </body>
 </html>
