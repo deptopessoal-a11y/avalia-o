@@ -205,29 +205,29 @@
  
   const app = initializeApp(firebaseConfig);
   const db  = getFirestore(app);
+ 
   const SENHA_CORRETA = "1901";
-  let avaliacaoAtiva = false;
-  let nomeColaborador = "";
-  let linkFormulario  = "";
-  let chaveColaborador = "";
+  let avaliacaoAtiva   = false;
+  let nomeColaborador  = "";
+  let linkFormulario   = "";
   let chaveColaborador = "";
  
+  // ── UI ──
   function loading(show, msg) {
     document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
     if (msg) document.getElementById('loading-msg').textContent = msg;
   }
  
   function mostrarSecao(id) {
-    document.querySelectorAll('.secao').forEach(s => s.classList.remove('ativa'));
-    document.getElementById('secao-formulario').classList.remove('ativo');
-    if (id === 'secao-formulario') {
-      document.getElementById('secao-formulario').classList.add('ativo');
-    } else {
-      document.getElementById(id).classList.add('ativa');
-    }
+    ['secao-nome','secao-instrucoes','secao-formulario','secao-encerrada'].forEach(s => {
+      document.getElementById(s).style.display = 'none';
+    });
+    const alvo = document.getElementById(id);
+    alvo.style.display = 'flex';
+    if (id === 'secao-formulario') alvo.style.flexDirection = 'column';
   }
  
-  // Normaliza nome: remove acentos, minúsculo, underline
+  // ── Normaliza nome para chave ──
   function normalizar(nome) {
     return nome.trim().toLowerCase()
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -235,26 +235,26 @@
       .replace(/[^a-z0-9_]/g, '');
   }
  
-  // Busca por chave exata e fallback por todos os documentos
-  async async function buscarAutorizado(nomeDigitado) {
+  // ── Busca colaborador autorizado ──
+  async function buscarAutorizado(nomeDigitado) {
     const chaveDigitada = normalizar(nomeDigitado);
  
-    // 1. Tenta chave exata
+    // Tenta chave exata primeiro
     const snapExato = await getDoc(doc(db, "autorizados", chaveDigitada));
     if (snapExato.exists()) return { chave: chaveDigitada, dados: snapExato.data() };
  
-    // 2. Fallback: varre todos e compara normalizado
+    // Fallback: varre todos e compara normalizado
     const todos = await getDocs(collection(db, "autorizados"));
     let encontrado = null;
     todos.forEach(d => {
-      const dadosNorm = normalizar(d.data().nome || '');
-      if (dadosNorm === chaveDigitada) {
+      if (normalizar(d.data().nome || '') === chaveDigitada) {
         encontrado = { chave: d.id, dados: d.data() };
       }
     });
     return encontrado;
   }
  
+  // ── PASSO 1: Confirmar nome ──
   window.confirmarNome = async function() {
     const input = document.getElementById('input-nome');
     const erro  = document.getElementById('nome-erro');
@@ -270,21 +270,15 @@
     loading(true, 'Verificando autorização...');
  
     try {
-      const chaveDigitada = normalizar(nome);
-      console.log('[ACE] Nome digitado:', nome);
-      console.log('[ACE] Chave gerada:', chaveDigitada);
- 
       const autorizado = await buscarAutorizado(nome);
-      console.log('[ACE] Resultado busca:', autorizado);
  
       if (!autorizado) {
         loading(false);
-        erro.textContent = 'Nome não encontrado. Chave buscada: "' + chaveDigitada + '". Verifique com o responsável.';
+        erro.textContent = 'Nome não encontrado na lista de autorizados. Verifique com o responsável.';
         erro.style.display = 'block';
         return;
       }
  
-      // Verifica se tem link cadastrado
       if (!autorizado.dados.link) {
         loading(false);
         erro.textContent = 'Nenhuma avaliação disponível para você no momento. Aguarde o responsável.';
@@ -292,31 +286,29 @@
         return;
       }
  
+      nomeColaborador  = autorizado.dados.nome || nome;
       linkFormulario   = autorizado.dados.link;
       chaveColaborador = autorizado.chave;
  
       // Verifica se está bloqueado
-      const bloqSnap = await getDoc(doc(db, "bloqueados", autorizado.chave));
-      if (bloqSnap.exists()) {
-        nomeColaborador = autorizado.dados.nome || nome;
-        chaveColaborador = autorizado.chave;
-        loading(false);
-        mostrarSecao('secao-encerrada');
-        return;
-      }
- 
-      nomeColaborador = autorizado.dados.nome || nome;
-      chaveColaborador = autorizado.chave;
+      const bloqSnap = await getDoc(doc(db, "bloqueados", chaveColaborador));
       loading(false);
-      mostrarSecao('secao-instrucoes');
+ 
+      if (bloqSnap.exists()) {
+        mostrarSecao('secao-encerrada');
+      } else {
+        mostrarSecao('secao-instrucoes');
+      }
  
     } catch(e) {
       loading(false);
       erro.textContent = 'Erro de conexão. Verifique sua internet e tente novamente.';
       erro.style.display = 'block';
+      console.error('[ACE] Erro:', e);
     }
   };
  
+  // ── PASSO 2: Iniciar avaliação ──
   window.iniciarAvaliacao = function() {
     document.getElementById('formulario').src = linkFormulario;
     document.getElementById('label-nome-ativo').textContent = nomeColaborador;
@@ -324,40 +316,57 @@
     avaliacaoAtiva = true;
   };
  
-  // Detecta APENAS troca de aba — visibilitychange é o único evento confiável
+  // ── Detecta troca de aba ──
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden" && avaliacaoAtiva) {
-      const chave = chaveColaborador;
       const nome  = nomeColaborador;
+      const chave = chaveColaborador;
       if (!nome) return;
       avaliacaoAtiva = false;
-      setDoc(doc(db, "bloqueados", chave), { nome, bloqueadoEm: new Date().toISOString() }).catch(()=>{});
+      setDoc(doc(db, "bloqueados", chave), {
+        nome,
+        bloqueadoEm: new Date().toISOString()
+      }).catch(() => {});
       mostrarSecao('secao-encerrada');
     }
   });
  
+  // ── Senha de liberação ──
   window.verificarSenha = async function() {
     const senha = document.getElementById('input-senha').value;
     const erro  = document.getElementById('senha-erro');
+ 
     if (senha !== SENHA_CORRETA) {
       erro.style.display = 'block';
       document.getElementById('input-senha').value = '';
       document.getElementById('input-senha').focus();
       return;
     }
+ 
     erro.style.display = 'none';
     loading(true, 'Liberando acesso...');
-    try { await deleteDoc(doc(db, "bloqueados", chaveColaborador)); } catch(e) {}
+ 
+    try {
+      await deleteDoc(doc(db, "bloqueados", chaveColaborador));
+    } catch(e) {}
+ 
     loading(false);
     document.getElementById('input-senha').value = '';
     document.getElementById('formulario').src = 'about:blank';
-    nomeColaborador = ''; chaveColaborador = '';
-    document.getElementById('input-nome').value = '';
+    nomeColaborador  = '';
+    chaveColaborador = '';
+    linkFormulario   = '';
     mostrarSecao('secao-nome');
+    document.getElementById('input-nome').value = '';
   };
  
-  document.getElementById('input-senha').addEventListener('keydown', e => { if(e.key==='Enter') window.verificarSenha(); });
-  document.getElementById('input-nome').addEventListener('keydown',  e => { if(e.key==='Enter') window.confirmarNome(); });
+  // ── Enter nos campos ──
+  document.getElementById('input-nome').addEventListener('keydown', e => {
+    if (e.key === 'Enter') window.confirmarNome();
+  });
+  document.getElementById('input-senha').addEventListener('keydown', e => {
+    if (e.key === 'Enter') window.verificarSenha();
+  });
 </script>
 </body>
 </html>
