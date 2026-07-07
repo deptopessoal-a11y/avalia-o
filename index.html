@@ -192,7 +192,7 @@
  
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
  
   const firebaseConfig = {
     apiKey: "AIzaSyDHKonTFEuT09ZqmM6ovrt_l3Uwij9n1Ts",
@@ -235,13 +235,24 @@
       .replace(/[^a-z0-9_]/g, '');
   }
  
-  // Busca nomes autorizados com correspondência flexível
-  async function buscarAutorizado(nomeDigitado) {
-    const chave = normalizar(nomeDigitado);
-    const ref = doc(db, "autorizados", chave);
-    const snap = await getDoc(ref);
-    if (snap.exists()) return { chave, dados: snap.data() };
-    return null;
+  // Busca por chave exata e fallback por todos os documentos
+  async async function buscarAutorizado(nomeDigitado) {
+    const chaveDigitada = normalizar(nomeDigitado);
+ 
+    // 1. Tenta chave exata
+    const snapExato = await getDoc(doc(db, "autorizados", chaveDigitada));
+    if (snapExato.exists()) return { chave: chaveDigitada, dados: snapExato.data() };
+ 
+    // 2. Fallback: varre todos e compara normalizado
+    const todos = await getDocs(collection(db, "autorizados"));
+    let encontrado = null;
+    todos.forEach(d => {
+      const dadosNorm = normalizar(d.data().nome || '');
+      if (dadosNorm === chaveDigitada) {
+        encontrado = { chave: d.id, dados: d.data() };
+      }
+    });
+    return encontrado;
   }
  
   window.confirmarNome = async function() {
@@ -259,11 +270,16 @@
     loading(true, 'Verificando autorização...');
  
     try {
+      const chaveDigitada = normalizar(nome);
+      console.log('[ACE] Nome digitado:', nome);
+      console.log('[ACE] Chave gerada:', chaveDigitada);
+ 
       const autorizado = await buscarAutorizado(nome);
+      console.log('[ACE] Resultado busca:', autorizado);
  
       if (!autorizado) {
         loading(false);
-        erro.textContent = 'Nome não encontrado na lista de autorizados. Verifique com o responsável.';
+        erro.textContent = 'Nome não encontrado. Chave buscada: "' + chaveDigitada + '". Verifique com o responsável.';
         erro.style.display = 'block';
         return;
       }
