@@ -208,6 +208,8 @@
   const SENHA_CORRETA = "1901";
   let avaliacaoAtiva = false;
   let nomeColaborador = "";
+  let linkFormulario  = "";
+  let chaveColaborador = "";
   let chaveColaborador = "";
  
   function loading(show, msg) {
@@ -266,6 +268,17 @@
         return;
       }
  
+      // Verifica se tem link cadastrado
+      if (!autorizado.dados.link) {
+        loading(false);
+        erro.textContent = 'Nenhuma avaliação disponível para você no momento. Aguarde o responsável.';
+        erro.style.display = 'block';
+        return;
+      }
+ 
+      linkFormulario   = autorizado.dados.link;
+      chaveColaborador = autorizado.chave;
+ 
       // Verifica se está bloqueado
       const bloqSnap = await getDoc(doc(db, "bloqueados", autorizado.chave));
       if (bloqSnap.exists()) {
@@ -289,7 +302,7 @@
   };
  
   window.iniciarAvaliacao = function() {
-    document.getElementById('formulario').src = 'https://form.jotform.com/261605885042054';
+    document.getElementById('formulario').src = linkFormulario;
     document.getElementById('label-nome-ativo').textContent = nomeColaborador;
     mostrarSecao('secao-formulario');
     avaliacaoAtiva = true;
