@@ -127,7 +127,7 @@
     <div class="card sm">
       <div class="card-header">
         <div class="ch-icon">👤</div>
-        <div><h2>Identificação</h2><p>Informe seu nome para acessar a avaliação</p></div>
+        <div><h2>Identificação</h2><p>Informe seu primeiro e segundo nome para acessar a avaliação</p></div>
       </div>
       <div class="card-body">
         <p style="font-size:13px;color:var(--text-dim);margin-bottom:24px;line-height:1.65;">Seu nome será verificado na lista de colaboradores autorizados antes de prosseguir.</p>
@@ -261,7 +261,7 @@
     const nome  = input.value.trim();
  
     if (nome.length < 3) {
-      erro.textContent = 'Digite seu nome.';
+      erro.textContent = 'Digite seu primeiro e segundo nome.';
       erro.style.display = 'block';
       return;
     }
@@ -309,7 +309,16 @@
   };
  
   // ── PASSO 2: Iniciar avaliação ──
-  window.iniciarAvaliacao = function() {
+  window.iniciarAvaliacao = async function() {
+    // Grava bloqueio imediatamente ao iniciar — impede segunda tentativa mesmo que feche a página
+    try {
+      await setDoc(doc(db, "bloqueados", chaveColaborador), {
+        nome: nomeColaborador,
+        bloqueadoEm: new Date().toISOString()
+      });
+    } catch(e) {
+      console.error('[ACE] Erro ao registrar início:', e);
+    }
     document.getElementById('formulario').src = linkFormulario;
     document.getElementById('label-nome-ativo').textContent = nomeColaborador;
     mostrarSecao('secao-formulario');
