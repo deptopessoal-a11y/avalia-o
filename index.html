@@ -136,7 +136,7 @@
           <input type="text" id="input-nome" placeholder="Digite seu primeiro e segundo nome" autocomplete="off">
           <div class="field-erro" id="nome-erro"></div>
         </div>
-        <button class="btn-primary" onclick="confirmarNome()">Continuar →</button>
+        <button class="btn-primary" id="btn-confirmar">Continuar →</button>
       </div>
     </div>
   </div>
@@ -158,7 +158,7 @@
           <div class="regra"><span class="ri">🔒</span><p><strong>Integridade</strong>Os resultados são individuais e serão analisados pelo RH.</p></div>
         </div>
         <div class="aviso"><span>⚠️</span><p><strong>Atenção:</strong> Em caso de encerramento indevido, entre em contato com o responsável do setor para solicitar uma nova tentativa.</p></div>
-        <button class="btn-primary" onclick="iniciarAvaliacao()">Iniciar Avaliação →</button>
+        <button class="btn-primary" id="btn-iniciar">Iniciar Avaliação →</button>
       </div>
     </div>
   </div>
@@ -180,7 +180,7 @@
         <p>CÓDIGO DE LIBERAÇÃO</p>
         <div class="senha-row">
           <input type="password" id="input-senha" placeholder="Digite o código recebido" maxlength="20">
-          <button class="btn-liberar" onclick="verificarSenha()">Liberar</button>
+          <button class="btn-liberar" id="btn-liberar">Liberar</button>
         </div>
         <div class="senha-erro" id="senha-erro">Código incorreto. Tente novamente.</div>
       </div>
@@ -206,7 +206,6 @@
   const app = initializeApp(firebaseConfig);
   const db  = getFirestore(app);
  
-  const SENHA_CORRETA = "1901";
   let avaliacaoAtiva   = false;
   let nomeColaborador  = "";
   let linkFormulario   = "";
@@ -341,11 +340,21 @@
   });
  
   // ── Senha de liberação ──
+  async function hashSenha(senha) {
+    const enc  = new TextEncoder().encode(senha);
+    const buf  = await crypto.subtle.digest('SHA-256', enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+ 
   window.verificarSenha = async function() {
     const senha = document.getElementById('input-senha').value;
     const erro  = document.getElementById('senha-erro');
  
-    if (senha !== SENHA_CORRETA) {
+    const digitadoHash = await hashSenha(senha);
+    const snap = await getDoc(doc(db, 'config', 'admin'));
+    const senhaCorreta = snap.exists() ? snap.data().senhaHash : null;
+ 
+    if (!senhaCorreta || digitadoHash !== senhaCorreta) {
       erro.style.display = 'block';
       document.getElementById('input-senha').value = '';
       document.getElementById('input-senha').focus();
@@ -373,7 +382,15 @@
   document.getElementById('input-nome').addEventListener('keydown', e => {
     if (e.key === 'Enter') window.confirmarNome();
   });
-  document.getElementById('input-senha').addEventListener('keydown', e => {
+  // ── Listeners de botão ──
+  document.getElementById('btn-confirmar')?.addEventListener('click', () => window.confirmarNome());
+  document.getElementById('btn-iniciar')  ?.addEventListener('click', () => window.iniciarAvaliacao());
+  document.getElementById('btn-liberar')  ?.addEventListener('click', () => window.verificarSenha());
+ 
+  document.getElementById('input-nome') ?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') window.confirmarNome();
+  });
+  document.getElementById('input-senha')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') window.verificarSenha();
   });
 </script>
