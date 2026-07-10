@@ -1,0 +1,8 @@
+{
+  "name": "ace-formulario-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "firebase": "^10.12.0"
+  }
+}
