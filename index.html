@@ -152,7 +152,7 @@
         <div class="regras-grid">
           <div class="regra"><span class="ri">🎯</span><p><strong>Objetivo</strong>Avaliar o aproveitamento dos cursos realizados no mês pelos colaboradores.</p></div>
           <div class="regra"><span class="ri">⏱️</span><p><strong>Tempo</strong>Não há tempo limite, mas mantenha o foco durante toda a avaliação.</p></div>
-          <div class="regra alert"><span class="ri">🚫</span><p><strong>Não saia da página</strong>Trocar de aba ou minimizar o navegador encerrará automaticamente a avaliação.</p></div>
+          <div class="regra alert"><span class="ri">🚫</span><p><strong>Não saia da página</strong>Trocar de aba, minimizar ou clicar fora da janela do navegador encerrará automaticamente a avaliação.</p></div>
           <div class="regra"><span class="ri">📵</span><p><strong>Sem consultas</strong>A avaliação deve ser realizada sem auxílio de materiais ou terceiros.</p></div>
           <div class="regra"><span class="ri">✅</span><p><strong>Envio único</strong>Ao finalizar, clique em enviar. Não será possível alterar as respostas depois.</p></div>
           <div class="regra"><span class="ri">🔒</span><p><strong>Integridade</strong>Os resultados são individuais e serão analisados pelo RH.</p></div>
@@ -165,7 +165,7 @@
  
   <!-- TELA 3: FORMULÁRIO -->
   <div id="secao-formulario">
-    <div class="form-bar"><div class="pulse"></div><span id="label-nome-ativo"></span> — não feche ou troque de aba</div>
+    <div class="form-bar"><div class="pulse"></div><span id="label-nome-ativo"></span> — não feche, troque de aba nem clique fora desta janela</div>
     <iframe id="formulario" src="about:blank"></iframe>
   </div>
  
@@ -192,7 +192,7 @@
  
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
  
   const firebaseConfig = {
     apiKey: "AIzaSyDHKonTFEuT09ZqmM6ovrt_l3Uwij9n1Ts",
@@ -237,20 +237,8 @@
   // ── Busca colaborador autorizado ──
   async function buscarAutorizado(nomeDigitado) {
     const chaveDigitada = normalizar(nomeDigitado);
- 
-    // Tenta chave exata primeiro
-    const snapExato = await getDoc(doc(db, "autorizados", chaveDigitada));
-    if (snapExato.exists()) return { chave: chaveDigitada, dados: snapExato.data() };
- 
-    // Fallback: varre todos e compara normalizado
-    const todos = await getDocs(collection(db, "autorizados"));
-    let encontrado = null;
-    todos.forEach(d => {
-      if (normalizar(d.data().nome || '') === chaveDigitada) {
-        encontrado = { chave: d.id, dados: d.data() };
-      }
-    });
-    return encontrado;
+    const snap = await getDoc(doc(db, "autorizados", chaveDigitada));
+    return snap.exists() ? { chave: chaveDigitada, dados: snap.data() } : null;
   }
  
   // ── PASSO 1: Confirmar nome ──
@@ -324,20 +312,27 @@
     avaliacaoAtiva = true;
   };
  
-  // ── Detecta troca de aba ──
+  // ── Detecta saída da avaliação: troca de aba, minimizar OU perda de foco
+  //    da janela (ex.: abrir uma segunda janela do navegador lado a lado
+  //    para consultar respostas — isso não esconde a aba, então só
+  //    "visibilitychange" não pega esse caso; "blur" cobre) ──
+  function encerrarPorSaida() {
+    if (!avaliacaoAtiva) return;
+    const nome  = nomeColaborador;
+    const chave = chaveColaborador;
+    if (!nome) return;
+    avaliacaoAtiva = false;
+    setDoc(doc(db, "bloqueados", chave), {
+      nome,
+      bloqueadoEm: new Date().toISOString()
+    }).catch(() => {});
+    mostrarSecao('secao-encerrada');
+  }
+
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden" && avaliacaoAtiva) {
-      const nome  = nomeColaborador;
-      const chave = chaveColaborador;
-      if (!nome) return;
-      avaliacaoAtiva = false;
-      setDoc(doc(db, "bloqueados", chave), {
-        nome,
-        bloqueadoEm: new Date().toISOString()
-      }).catch(() => {});
-      mostrarSecao('secao-encerrada');
-    }
+    if (document.visibilityState === "hidden") encerrarPorSaida();
   });
+  window.addEventListener("blur", encerrarPorSaida);
  
   // ── Senha de liberação ──
   async function hashSenha(senha) {
