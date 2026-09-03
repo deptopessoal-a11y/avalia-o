@@ -88,14 +88,7 @@
     .enc-divider { width:48px;height:3px;background:var(--green);border-radius:2px;margin:18px auto 20px; }
     .enc-card p { font-size:14px;color:var(--text-dim);line-height:1.75; }
     .senha-area { margin-top:32px;padding-top:28px;border-top:1px solid var(--glass-border); }
-    .senha-area p { font-size:12px;color:var(--text-dim);margin-bottom:12px;letter-spacing:0.5px; }
-    .senha-row { display:flex;gap:8px; }
-    .senha-row input { flex:1;background:rgba(255,255,255,0.07);border:1px solid var(--glass-border);border-radius:10px;color:var(--white);font-family:'Inter',sans-serif;font-size:14px;padding:12px 16px;outline:none;transition:border-color 0.2s; }
-    .senha-row input:focus { border-color:var(--green); }
-    .senha-row input::placeholder { color:rgba(255,255,255,0.25); }
-    .btn-liberar { background:var(--green);color:var(--navy);font-family:'Inter',sans-serif;font-size:13px;font-weight:700;padding:12px 20px;border:none;border-radius:10px;cursor:pointer;transition:background 0.2s,transform 0.15s;white-space:nowrap; }
-    .btn-liberar:hover { background:var(--green-dark);transform:translateY(-1px); }
-    .senha-erro { margin-top:8px;font-size:12px;color:#ff6b6b;display:none; }
+    .senha-area p { font-size:12px;color:var(--text-dim);letter-spacing:0.5px;line-height:1.6; }
     #loading-overlay { display:none;position:fixed;inset:0;z-index:999;background:rgba(13,27,75,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;flex-direction:column;gap:16px; }
     .spinner { width:40px;height:40px;border:3px solid rgba(255,255,255,0.15);border-top-color:var(--green);border-radius:50%;animation:spin 0.8s linear infinite; }
     @keyframes spin { to{transform:rotate(360deg)} }
@@ -177,12 +170,7 @@
       <div class="enc-divider"></div>
       <p>Você saiu da página durante a avaliação.<br>Por questões de integridade, sua tentativa foi encerrada.<br><br>Entre em contato com o responsável do setor para solicitar uma nova tentativa.</p>
       <div class="senha-area">
-        <p>CÓDIGO DE LIBERAÇÃO</p>
-        <div class="senha-row">
-          <input type="password" id="input-senha" placeholder="Digite o código recebido" maxlength="20">
-          <button class="btn-liberar" id="btn-liberar">Liberar</button>
-        </div>
-        <div class="senha-erro" id="senha-erro">Código incorreto. Tente novamente.</div>
+        <p>Para tentar novamente, peça ao responsável do RH que libere seu nome pelo Painel Administrativo.</p>
       </div>
     </div>
   </div>
@@ -192,7 +180,7 @@
  
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
  
   const firebaseConfig = {
     apiKey: "AIzaSyDHKonTFEuT09ZqmM6ovrt_l3Uwij9n1Ts",
@@ -334,59 +322,12 @@
   });
   window.addEventListener("blur", encerrarPorSaida);
  
-  // ── Senha de liberação ──
-  async function hashSenha(senha) {
-    const enc  = new TextEncoder().encode(senha);
-    const buf  = await crypto.subtle.digest('SHA-256', enc);
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
-  }
- 
-  window.verificarSenha = async function() {
-    const senha = document.getElementById('input-senha').value;
-    const erro  = document.getElementById('senha-erro');
- 
-    const digitadoHash = await hashSenha(senha);
-    const snap = await getDoc(doc(db, 'config', 'admin'));
-    const senhaCorreta = snap.exists() ? snap.data().senhaHash : null;
- 
-    if (!senhaCorreta || digitadoHash !== senhaCorreta) {
-      erro.style.display = 'block';
-      document.getElementById('input-senha').value = '';
-      document.getElementById('input-senha').focus();
-      return;
-    }
- 
-    erro.style.display = 'none';
-    loading(true, 'Liberando acesso...');
- 
-    try {
-      await deleteDoc(doc(db, "bloqueados", chaveColaborador));
-    } catch(e) {}
- 
-    loading(false);
-    document.getElementById('input-senha').value = '';
-    document.getElementById('formulario').src = 'about:blank';
-    nomeColaborador  = '';
-    chaveColaborador = '';
-    linkFormulario   = '';
-    mostrarSecao('secao-nome');
-    document.getElementById('input-nome').value = '';
-  };
- 
-  // ── Enter nos campos ──
-  document.getElementById('input-nome').addEventListener('keydown', e => {
-    if (e.key === 'Enter') window.confirmarNome();
-  });
   // ── Listeners de botão ──
   document.getElementById('btn-confirmar')?.addEventListener('click', () => window.confirmarNome());
   document.getElementById('btn-iniciar')  ?.addEventListener('click', () => window.iniciarAvaliacao());
-  document.getElementById('btn-liberar')  ?.addEventListener('click', () => window.verificarSenha());
- 
+
   document.getElementById('input-nome') ?.addEventListener('keydown', e => {
     if (e.key === 'Enter') window.confirmarNome();
-  });
-  document.getElementById('input-senha')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') window.verificarSenha();
   });
 </script>
 </body>
