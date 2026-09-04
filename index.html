@@ -81,8 +81,21 @@
     .form-bar { background:rgba(13,27,75,0.80);backdrop-filter:blur(10px);border-bottom:1px solid var(--glass-border);padding:10px 40px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-dim); }
     .pulse { width:8px;height:8px;background:var(--green);border-radius:50%;flex-shrink:0;animation:pulse 1.4s infinite; }
     @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
-    .prova-area { flex:1;display:flex;justify-content:center;padding:32px 24px;overflow-y:auto; }
-    .prova-card { background:rgba(255,255,255,0.05);backdrop-filter:blur(20px);border:1px solid var(--glass-border);border-radius:20px;max-width:760px;width:100%;padding:36px 40px;height:fit-content; }
+    .prova-area {
+      flex:1;display:flex;justify-content:center;padding:40px 24px;overflow-y:auto;position:relative;
+      background:
+        linear-gradient(160deg,rgba(13,27,75,0.88) 0%,rgba(8,14,40,0.94) 100%),
+        url('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat fixed;
+    }
+    .prova-area::before {
+      content:''; position:absolute; inset:14px; border:1px solid rgba(90,230,32,0.28); border-radius:24px; pointer-events:none;
+    }
+    .prova-card {
+      background:rgba(13,27,75,0.60);backdrop-filter:blur(24px);
+      border:1px solid rgba(90,230,32,0.35);border-radius:20px;
+      max-width:760px;width:100%;padding:36px 40px;height:fit-content;position:relative;z-index:1;
+      box-shadow:0 0 0 1px rgba(90,230,32,0.10),0 24px 64px rgba(0,0,0,0.55),0 0 90px rgba(90,230,32,0.10);
+    }
     .prova-card h2 { font-size:19px;font-weight:700;margin-bottom:28px; }
     .pergunta-item { margin-bottom:28px;padding-bottom:28px;border-bottom:1px solid var(--glass-border); }
     .pergunta-item:last-of-type { border-bottom:none;margin-bottom:8px;padding-bottom:0; }
@@ -92,6 +105,14 @@
     .alternativa-opcao.selecionada { border-color:var(--green);background:rgba(90,230,32,0.08); }
     .alternativa-opcao input { accent-color:var(--green);flex-shrink:0; }
     .alternativa-opcao span { font-size:14px;color:rgba(255,255,255,0.85); }
+    .pergunta-item.pergunta-aberta { border-left:3px solid rgba(26,92,181,0.45); padding-left:16px; }
+    textarea.resposta-aberta {
+      width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(26,92,181,0.35);
+      border-radius:10px;color:var(--white);font-family:'Inter',sans-serif;font-size:14px;
+      padding:14px 16px;outline:none;resize:vertical;min-height:100px;transition:border-color 0.2s,background 0.2s;
+    }
+    textarea.resposta-aberta:focus { border-color:var(--blue);background:rgba(255,255,255,0.08); }
+    textarea.resposta-aberta::placeholder { color:rgba(255,255,255,0.28); }
     .prova-aviso-incompleta { font-size:13px;color:#ff6b6b;margin-bottom:16px;text-align:center;display:none; }
     .enc-card { background:rgba(255,255,255,0.05);backdrop-filter:blur(20px);border:1px solid rgba(255,80,80,0.20);border-radius:20px;padding:52px 44px;max-width:480px;width:100%;text-align:center;box-shadow:0 8px 48px rgba(0,0,0,0.35); }
     .enc-icon { font-size:58px;margin-bottom:18px; }
@@ -318,23 +339,40 @@
     }
   };
  
-  // ── Renderiza as perguntas da prova na tela ──
+  // ── Renderiza as perguntas da prova na tela (múltipla escolha ou
+  //    aberta/dissertativa — essa última não é corrigida sozinha) ──
   function renderPerguntas(perguntas) {
     const el = document.getElementById('prova-perguntas');
-    el.innerHTML = perguntas.map((p, i) => `
-      <div class="pergunta-item">
-        <div class="pergunta-enunciado">${i + 1}. ${escapeHtml(p.enunciado)}</div>
-        ${p.alternativas.map((a, j) => `
-          <label class="alternativa-opcao" id="opcao-${i}-${j}">
-            <input type="radio" name="pergunta-${i}" value="${j}">
-            <span>${escapeHtml(a)}</span>
-          </label>`).join('')}
-      </div>`).join('');
+    el.innerHTML = perguntas.map((p, i) => {
+      if (p.tipo === 'aberta') {
+        return `
+          <div class="pergunta-item pergunta-aberta">
+            <div class="pergunta-enunciado">${i + 1}. ${escapeHtml(p.enunciado)}</div>
+            <textarea class="resposta-aberta" id="aberta-${i}" rows="4" placeholder="Digite sua resposta..."></textarea>
+          </div>`;
+      }
+      return `
+        <div class="pergunta-item">
+          <div class="pergunta-enunciado">${i + 1}. ${escapeHtml(p.enunciado)}</div>
+          ${p.alternativas.map((a, j) => `
+            <label class="alternativa-opcao" id="opcao-${i}-${j}">
+              <input type="radio" name="pergunta-${i}" value="${j}">
+              <span>${escapeHtml(a)}</span>
+            </label>`).join('')}
+        </div>`;
+    }).join('');
 
     el.querySelectorAll('input[type="radio"]').forEach(radio => {
       radio.addEventListener('change', e => {
         const [ , i, j ] = e.target.closest('.alternativa-opcao').id.split('-');
         window.selecionarResposta(Number(i), Number(j));
+      });
+    });
+    el.querySelectorAll('.resposta-aberta').forEach(ta => {
+      ta.addEventListener('input', e => {
+        const i = Number(e.target.id.split('-')[1]);
+        respostasSelecionadas[i] = e.target.value;
+        document.getElementById('prova-aviso').style.display = 'none';
       });
     });
   }
@@ -383,17 +421,42 @@
     avaliacaoAtiva = true;
   };
 
-  // ── PASSO 3: Enviar respostas (corrige múltipla escolha automaticamente) ──
+  // ── PASSO 3: Enviar respostas (corrige múltipla escolha automaticamente;
+  //    perguntas abertas não têm correção automática, só ficam
+  //    registradas pro RH ler) ──
   window.enviarProva = async function() {
-    if (respostasSelecionadas.some(r => r === null || r === undefined)) {
+    const faltando = provaAtiva.perguntas.some((p, i) => {
+      const r = respostasSelecionadas[i];
+      if (p.tipo === 'aberta') return !r || !String(r).trim();
+      return r === null || r === undefined;
+    });
+    if (faltando) {
       document.getElementById('prova-aviso').style.display = 'block';
       return;
     }
 
     loading(true, 'Enviando respostas...');
     let acertos = 0;
-    provaAtiva.perguntas.forEach((p, i) => {
-      if (respostasSelecionadas[i] === p.correta) acertos++;
+    let total   = 0;
+    // Grava um retrato completo de cada pergunta — não só o índice/texto
+    // escolhido — pra sobreviver a uma prova que seja editada ou apagada
+    // depois, e permitir revisar questão por questão no Admin/relatório.
+    // Perguntas abertas entram no retrato mas não contam pra nota (total),
+    // já que não há como corrigi-las automaticamente.
+    const perguntasRespondidas = provaAtiva.perguntas.map((p, i) => {
+      if (p.tipo === 'aberta') {
+        return { tipo: 'aberta', enunciado: p.enunciado, resposta: String(respostasSelecionadas[i]).trim() };
+      }
+      total++;
+      const escolhida = respostasSelecionadas[i];
+      if (escolhida === p.correta) acertos++;
+      return {
+        tipo: 'multipla',
+        enunciado: p.enunciado,
+        alternativas: p.alternativas,
+        correta: p.correta,
+        escolhida
+      };
     });
 
     try {
@@ -401,9 +464,9 @@
         nome: nomeColaborador,
         provaId: provaAtiva.id,
         tituloProva: provaAtiva.titulo,
-        respostas: respostasSelecionadas,
+        perguntas: perguntasRespondidas,
         acertos,
-        total: provaAtiva.perguntas.length,
+        total,
         enviadoEm: new Date().toISOString()
       });
     } catch(e) {
