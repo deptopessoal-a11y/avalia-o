@@ -81,7 +81,18 @@
     .form-bar { background:rgba(13,27,75,0.80);backdrop-filter:blur(10px);border-bottom:1px solid var(--glass-border);padding:10px 40px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-dim); }
     .pulse { width:8px;height:8px;background:var(--green);border-radius:50%;flex-shrink:0;animation:pulse 1.4s infinite; }
     @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
-    iframe#formulario { width:100%;flex:1;border:none;display:block;min-height:calc(100vh - 120px); }
+    .prova-area { flex:1;display:flex;justify-content:center;padding:32px 24px;overflow-y:auto; }
+    .prova-card { background:rgba(255,255,255,0.05);backdrop-filter:blur(20px);border:1px solid var(--glass-border);border-radius:20px;max-width:760px;width:100%;padding:36px 40px;height:fit-content; }
+    .prova-card h2 { font-size:19px;font-weight:700;margin-bottom:28px; }
+    .pergunta-item { margin-bottom:28px;padding-bottom:28px;border-bottom:1px solid var(--glass-border); }
+    .pergunta-item:last-of-type { border-bottom:none;margin-bottom:8px;padding-bottom:0; }
+    .pergunta-enunciado { font-size:15px;font-weight:600;margin-bottom:16px;line-height:1.5; }
+    .alternativa-opcao { display:flex;align-items:center;gap:12px;padding:12px 16px;border:1px solid var(--glass-border);border-radius:10px;margin-bottom:8px;cursor:pointer;transition:border-color 0.2s,background 0.2s; }
+    .alternativa-opcao:hover { background:rgba(255,255,255,0.04); }
+    .alternativa-opcao.selecionada { border-color:var(--green);background:rgba(90,230,32,0.08); }
+    .alternativa-opcao input { accent-color:var(--green);flex-shrink:0; }
+    .alternativa-opcao span { font-size:14px;color:rgba(255,255,255,0.85); }
+    .prova-aviso-incompleta { font-size:13px;color:#ff6b6b;margin-bottom:16px;text-align:center;display:none; }
     .enc-card { background:rgba(255,255,255,0.05);backdrop-filter:blur(20px);border:1px solid rgba(255,80,80,0.20);border-radius:20px;padding:52px 44px;max-width:480px;width:100%;text-align:center;box-shadow:0 8px 48px rgba(0,0,0,0.35); }
     .enc-icon { font-size:58px;margin-bottom:18px; }
     .enc-card h2 { font-size:22px;font-weight:700;color:#ff6b6b;margin-bottom:12px; }
@@ -156,12 +167,30 @@
     </div>
   </div>
  
-  <!-- TELA 3: FORMULÁRIO -->
+  <!-- TELA 3: FORMULÁRIO (perguntas renderizadas direto na página) -->
   <div id="secao-formulario">
     <div class="form-bar"><div class="pulse"></div><span id="label-nome-ativo"></span> — não feche, troque de aba nem clique fora desta janela</div>
-    <iframe id="formulario" src="about:blank"></iframe>
+    <div class="prova-area">
+      <div class="prova-card">
+        <h2 id="prova-titulo-ativo"></h2>
+        <div id="prova-perguntas"></div>
+        <div class="prova-aviso-incompleta" id="prova-aviso">Responda todas as perguntas antes de enviar.</div>
+        <button class="btn-primary" id="btn-enviar-prova">Enviar Respostas →</button>
+      </div>
+    </div>
   </div>
- 
+
+  <!-- TELA 5: ENVIADA -->
+  <div class="secao" id="secao-enviada">
+    <div class="card sm">
+      <div class="card-body" style="text-align:center;">
+        <div style="font-size:52px;margin-bottom:14px;">✅</div>
+        <h2 style="font-size:19px;font-weight:700;margin-bottom:10px;">Prova enviada!</h2>
+        <p style="font-size:13px;color:var(--text-dim);line-height:1.65;">Suas respostas foram registradas com sucesso.<br>Obrigado por participar da avaliação.</p>
+      </div>
+    </div>
+  </div>
+
   <!-- TELA 4: ENCERRADA -->
   <div class="secao" id="secao-encerrada">
     <div class="enc-card">
@@ -180,7 +209,7 @@
  
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, doc, getDoc, setDoc, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
  
   const firebaseConfig = {
     apiKey: "AIzaSyDHKonTFEuT09ZqmM6ovrt_l3Uwij9n1Ts",
@@ -194,19 +223,25 @@
   const app = initializeApp(firebaseConfig);
   const db  = getFirestore(app);
  
-  let avaliacaoAtiva   = false;
-  let nomeColaborador  = "";
-  let linkFormulario   = "";
-  let chaveColaborador = "";
- 
+  let avaliacaoAtiva      = false;
+  let nomeColaborador     = "";
+  let provaIdColaborador  = "";
+  let chaveColaborador    = "";
+  let provaAtiva          = null;   // { id, titulo, perguntas: [...] }
+  let respostasSelecionadas = [];   // índice da alternativa escolhida por pergunta
+
   // ── UI ──
   function loading(show, msg) {
     document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
     if (msg) document.getElementById('loading-msg').textContent = msg;
   }
- 
+
+  function escapeHtml(str) {
+    return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
   function mostrarSecao(id) {
-    ['secao-nome','secao-instrucoes','secao-formulario','secao-encerrada'].forEach(s => {
+    ['secao-nome','secao-instrucoes','secao-formulario','secao-encerrada','secao-enviada'].forEach(s => {
       document.getElementById(s).style.display = 'none';
     });
     const alvo = document.getElementById(id);
@@ -254,16 +289,16 @@
         return;
       }
  
-      if (!autorizado.dados.link) {
+      if (!autorizado.dados.provaId) {
         loading(false);
         erro.textContent = 'Nenhuma avaliação disponível para você no momento. Aguarde o responsável.';
         erro.style.display = 'block';
         return;
       }
- 
-      nomeColaborador  = autorizado.dados.nome || nome;
-      linkFormulario   = autorizado.dados.link;
-      chaveColaborador = autorizado.chave;
+
+      nomeColaborador    = autorizado.dados.nome || nome;
+      provaIdColaborador = autorizado.dados.provaId;
+      chaveColaborador   = autorizado.chave;
  
       // Verifica se está bloqueado
       const bloqSnap = await getDoc(doc(db, "bloqueados", chaveColaborador));
@@ -283,6 +318,34 @@
     }
   };
  
+  // ── Renderiza as perguntas da prova na tela ──
+  function renderPerguntas(perguntas) {
+    const el = document.getElementById('prova-perguntas');
+    el.innerHTML = perguntas.map((p, i) => `
+      <div class="pergunta-item">
+        <div class="pergunta-enunciado">${i + 1}. ${escapeHtml(p.enunciado)}</div>
+        ${p.alternativas.map((a, j) => `
+          <label class="alternativa-opcao" id="opcao-${i}-${j}">
+            <input type="radio" name="pergunta-${i}" value="${j}">
+            <span>${escapeHtml(a)}</span>
+          </label>`).join('')}
+      </div>`).join('');
+
+    el.querySelectorAll('input[type="radio"]').forEach(radio => {
+      radio.addEventListener('change', e => {
+        const [ , i, j ] = e.target.closest('.alternativa-opcao').id.split('-');
+        window.selecionarResposta(Number(i), Number(j));
+      });
+    });
+  }
+
+  window.selecionarResposta = function(perguntaIdx, alternativaIdx) {
+    respostasSelecionadas[perguntaIdx] = alternativaIdx;
+    document.querySelectorAll(`[id^="opcao-${perguntaIdx}-"]`).forEach(el => el.classList.remove('selecionada'));
+    document.getElementById(`opcao-${perguntaIdx}-${alternativaIdx}`).classList.add('selecionada');
+    document.getElementById('prova-aviso').style.display = 'none';
+  };
+
   // ── PASSO 2: Iniciar avaliação ──
   window.iniciarAvaliacao = async function() {
     // Grava bloqueio imediatamente ao iniciar — impede segunda tentativa mesmo que feche a página
@@ -294,10 +357,62 @@
     } catch(e) {
       console.error('[ACE] Erro ao registrar início:', e);
     }
-    document.getElementById('formulario').src = '/api/formulario?chave=' + encodeURIComponent(chaveColaborador);
+
+    loading(true, 'Carregando avaliação...');
+    try {
+      const snap = await getDoc(doc(db, 'provas', provaIdColaborador));
+      if (!snap.exists()) {
+        loading(false);
+        alert('A prova atribuída não foi encontrada. Fale com o responsável.');
+        return;
+      }
+      provaAtiva = { id: snap.id, ...snap.data() };
+      respostasSelecionadas = new Array(provaAtiva.perguntas.length).fill(null);
+      document.getElementById('prova-titulo-ativo').textContent = provaAtiva.titulo;
+      document.getElementById('prova-aviso').style.display = 'none';
+      renderPerguntas(provaAtiva.perguntas);
+    } catch(e) {
+      loading(false);
+      alert('Erro ao carregar a prova. Verifique sua internet e tente novamente.');
+      return;
+    }
+    loading(false);
+
     document.getElementById('label-nome-ativo').textContent = nomeColaborador;
     mostrarSecao('secao-formulario');
     avaliacaoAtiva = true;
+  };
+
+  // ── PASSO 3: Enviar respostas (corrige múltipla escolha automaticamente) ──
+  window.enviarProva = async function() {
+    if (respostasSelecionadas.some(r => r === null || r === undefined)) {
+      document.getElementById('prova-aviso').style.display = 'block';
+      return;
+    }
+
+    loading(true, 'Enviando respostas...');
+    let acertos = 0;
+    provaAtiva.perguntas.forEach((p, i) => {
+      if (respostasSelecionadas[i] === p.correta) acertos++;
+    });
+
+    try {
+      await addDoc(collection(db, 'resultados'), {
+        nome: nomeColaborador,
+        provaId: provaAtiva.id,
+        tituloProva: provaAtiva.titulo,
+        respostas: respostasSelecionadas,
+        acertos,
+        total: provaAtiva.perguntas.length,
+        enviadoEm: new Date().toISOString()
+      });
+    } catch(e) {
+      console.error('[ACE] Erro ao salvar resultado:', e);
+    }
+
+    avaliacaoAtiva = false;
+    loading(false);
+    mostrarSecao('secao-enviada');
   };
  
   // ── Detecta saída da avaliação: troca de aba, minimizar OU perda de foco
@@ -321,22 +436,15 @@
     if (document.visibilityState === "hidden") encerrarPorSaida();
   });
 
-  // "blur" na janela principal dispara tanto quando o navegador perde o
-  // foco de verdade (trocou de janela/app) quanto quando o próprio
-  // colaborador clica dentro do iframe da prova pra responder — os dois
-  // casos parecem iguais pro navegador (o foco "sai" da janela nos dois).
-  // Espera um instante pro document.activeElement se estabilizar: se o
-  // foco foi pro iframe da avaliação, é uso normal, não é saída.
-  window.addEventListener("blur", () => {
-    setTimeout(() => {
-      if (document.activeElement === document.getElementById('formulario')) return;
-      encerrarPorSaida();
-    }, 0);
-  });
- 
+  // Sem mais iframe, "blur" na janela principal já reflete perda de foco
+  // de verdade (trocou de janela/app) — não tem mais o caso de clicar
+  // dentro de um formulário externo pra contornar.
+  window.addEventListener("blur", encerrarPorSaida);
+
   // ── Listeners de botão ──
-  document.getElementById('btn-confirmar')?.addEventListener('click', () => window.confirmarNome());
-  document.getElementById('btn-iniciar')  ?.addEventListener('click', () => window.iniciarAvaliacao());
+  document.getElementById('btn-confirmar')  ?.addEventListener('click', () => window.confirmarNome());
+  document.getElementById('btn-iniciar')    ?.addEventListener('click', () => window.iniciarAvaliacao());
+  document.getElementById('btn-enviar-prova')?.addEventListener('click', () => window.enviarProva());
 
   document.getElementById('input-nome') ?.addEventListener('keydown', e => {
     if (e.key === 'Enter') window.confirmarNome();
