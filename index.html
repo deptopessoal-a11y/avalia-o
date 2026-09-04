@@ -88,7 +88,14 @@
     .enc-divider { width:48px;height:3px;background:var(--green);border-radius:2px;margin:18px auto 20px; }
     .enc-card p { font-size:14px;color:var(--text-dim);line-height:1.75; }
     .senha-area { margin-top:32px;padding-top:28px;border-top:1px solid var(--glass-border); }
-    .senha-area p { font-size:12px;color:var(--text-dim);letter-spacing:0.5px;line-height:1.6; }
+    .senha-area p { font-size:12px;color:var(--text-dim);letter-spacing:0.5px;line-height:1.6;margin-bottom:12px; }
+    .senha-row { display:flex;gap:8px; }
+    .senha-row input { flex:1;background:rgba(255,255,255,0.07);border:1px solid var(--glass-border);border-radius:10px;color:var(--white);font-family:'Inter',sans-serif;font-size:14px;padding:12px 16px;outline:none;transition:border-color 0.2s; }
+    .senha-row input:focus { border-color:var(--green); }
+    .senha-row input::placeholder { color:rgba(255,255,255,0.25); }
+    .btn-liberar { background:var(--green);color:var(--navy);font-family:'Inter',sans-serif;font-size:13px;font-weight:700;padding:12px 20px;border:none;border-radius:10px;cursor:pointer;transition:background 0.2s,transform 0.15s;white-space:nowrap; }
+    .btn-liberar:hover { background:var(--green-dark);transform:translateY(-1px); }
+    .senha-erro { margin-top:8px;font-size:12px;color:#ff6b6b;display:none; }
     #loading-overlay { display:none;position:fixed;inset:0;z-index:999;background:rgba(13,27,75,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;flex-direction:column;gap:16px; }
     .spinner { width:40px;height:40px;border:3px solid rgba(255,255,255,0.15);border-top-color:var(--green);border-radius:50%;animation:spin 0.8s linear infinite; }
     @keyframes spin { to{transform:rotate(360deg)} }
@@ -170,7 +177,12 @@
       <div class="enc-divider"></div>
       <p>Você saiu da página durante a avaliação.<br>Por questões de integridade, sua tentativa foi encerrada.<br><br>Entre em contato com o responsável do setor para solicitar uma nova tentativa.</p>
       <div class="senha-area">
-        <p>Para tentar novamente, peça ao responsável do RH que libere seu nome pelo Painel Administrativo.</p>
+        <p>Peça ao responsável do RH que libere seu nome pelo Painel Administrativo, ou digite abaixo o código de liberação:</p>
+        <div class="senha-row">
+          <input type="password" id="input-senha" placeholder="Digite o código recebido" maxlength="20">
+          <button class="btn-liberar" id="btn-liberar">Liberar</button>
+        </div>
+        <div class="senha-erro" id="senha-erro">Código incorreto. Tente novamente.</div>
       </div>
     </div>
   </div>
@@ -334,12 +346,60 @@
     }, 0);
   });
  
+  // ── Liberação por código (verificada no servidor, não mais no
+  //    navegador — quem apaga o bloqueio é a função /api/liberar,
+  //    usando credencial de admin; o navegador do colaborador nunca
+  //    tem permissão de apagar isso diretamente) ──
+  window.verificarSenha = async function() {
+    const input = document.getElementById('input-senha');
+    const senha = input.value;
+    const erro  = document.getElementById('senha-erro');
+
+    if (!senha) return;
+    erro.style.display = 'none';
+    loading(true, 'Verificando código...');
+
+    try {
+      const resp  = await fetch('/api/liberar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chave: chaveColaborador, senha })
+      });
+      const dados = await resp.json().catch(() => ({}));
+
+      if (!resp.ok || !dados.ok) {
+        loading(false);
+        erro.style.display = 'block';
+        input.value = '';
+        input.focus();
+        return;
+      }
+
+      loading(false);
+      input.value = '';
+      document.getElementById('formulario').src = 'about:blank';
+      nomeColaborador  = '';
+      chaveColaborador = '';
+      linkFormulario   = '';
+      mostrarSecao('secao-nome');
+      document.getElementById('input-nome').value = '';
+    } catch(e) {
+      loading(false);
+      erro.textContent = 'Erro de conexão. Verifique sua internet e tente novamente.';
+      erro.style.display = 'block';
+    }
+  };
+
   // ── Listeners de botão ──
   document.getElementById('btn-confirmar')?.addEventListener('click', () => window.confirmarNome());
   document.getElementById('btn-iniciar')  ?.addEventListener('click', () => window.iniciarAvaliacao());
+  document.getElementById('btn-liberar')  ?.addEventListener('click', () => window.verificarSenha());
 
   document.getElementById('input-nome') ?.addEventListener('keydown', e => {
     if (e.key === 'Enter') window.confirmarNome();
+  });
+  document.getElementById('input-senha')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') window.verificarSenha();
   });
 </script>
 </body>
