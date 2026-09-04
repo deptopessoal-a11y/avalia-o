@@ -320,7 +320,19 @@
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") encerrarPorSaida();
   });
-  window.addEventListener("blur", encerrarPorSaida);
+
+  // "blur" na janela principal dispara tanto quando o navegador perde o
+  // foco de verdade (trocou de janela/app) quanto quando o próprio
+  // colaborador clica dentro do iframe da prova pra responder — os dois
+  // casos parecem iguais pro navegador (o foco "sai" da janela nos dois).
+  // Espera um instante pro document.activeElement se estabilizar: se o
+  // foco foi pro iframe da avaliação, é uso normal, não é saída.
+  window.addEventListener("blur", () => {
+    setTimeout(() => {
+      if (document.activeElement === document.getElementById('formulario')) return;
+      encerrarPorSaida();
+    }, 0);
+  });
  
   // ── Listeners de botão ──
   document.getElementById('btn-confirmar')?.addEventListener('click', () => window.confirmarNome());
