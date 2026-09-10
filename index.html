@@ -98,6 +98,7 @@
       box-shadow:0 0 0 1px rgba(52,211,153,0.09),0 24px 64px rgba(0,0,0,0.38),0 0 90px rgba(52,211,153,0.12);
     }
     .prova-card h2 { font-size:19px;font-weight:700;margin-bottom:28px; }
+    .prova-progresso-aviso { display:none;align-items:center;gap:10px;background:rgba(52,211,153,0.10);border:1px solid rgba(52,211,153,0.30);color:#bdf5df;font-size:12.5px;line-height:1.5;border-radius:10px;padding:12px 16px;margin:-14px 0 24px; }
     .pergunta-item { margin-bottom:28px;padding-bottom:28px;border-bottom:1px solid var(--glass-border); }
     .pergunta-item:last-of-type { border-bottom:none;margin-bottom:8px;padding-bottom:0; }
     .pergunta-enunciado { font-size:15px;font-weight:600;margin-bottom:16px;line-height:1.5; }
@@ -195,6 +196,7 @@
     <div class="prova-area">
       <div class="prova-card">
         <h2 id="prova-titulo-ativo"></h2>
+        <div class="prova-progresso-aviso" id="prova-progresso-restaurado">↻ Continuando de onde você parou — suas respostas anteriores foram recuperadas.</div>
         <div id="prova-perguntas"></div>
         <div class="prova-aviso-incompleta" id="prova-aviso">Responda todas as perguntas antes de enviar.</div>
         <button class="btn-primary" id="btn-enviar-prova">Enviar Respostas →</button>
@@ -231,7 +233,7 @@
  
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, doc, getDoc, setDoc, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
  
   const firebaseConfig = {
     apiKey: "AIzaSyDHKonTFEuT09ZqmM6ovrt_l3Uwij9n1Ts",
@@ -251,6 +253,8 @@
   let chaveColaborador    = "";
   let provaAtiva          = null;   // { id, titulo, perguntas: [...] }
   let respostasSelecionadas = [];   // índice da alternativa escolhida por pergunta
+  let progressoRestaurado  = false; // true quando a prova foi recarregada a partir de um progresso salvo
+  let salvarProgressoTimer = null;  // debounce do autosave de progresso
 
   // ── UI ──
   function loading(show, msg) {
@@ -340,6 +344,47 @@
     }
   };
  
+  // ── Autosave do progresso (respostas já preenchidas) ──
+  // Salva continuamente o que a pessoa já respondeu/escreveu numa
+  // coleção separada (provas_em_andamento), pra não perder nada se ela
+  // for bloqueada sem querer (troca de aba/perda de foco por engano).
+  // Ao ser liberada pelo RH, a próxima tentativa recupera essas
+  // respostas automaticamente em vez de começar do zero (ver
+  // iniciarAvaliacao/aplicarProgressoNaTela).
+  function salvarProgressoAgora() {
+    if (salvarProgressoTimer) { clearTimeout(salvarProgressoTimer); salvarProgressoTimer = null; }
+    if (!avaliacaoAtiva || !provaAtiva || !chaveColaborador) return;
+    setDoc(doc(db, 'provas_em_andamento', chaveColaborador), {
+      nome: nomeColaborador,
+      provaId: provaAtiva.id,
+      respostas: respostasSelecionadas,
+      atualizadoEm: new Date().toISOString()
+    }).catch(e => console.error('[ACE] Erro ao salvar progresso:', e));
+  }
+
+  function salvarProgressoDebounced() {
+    if (salvarProgressoTimer) clearTimeout(salvarProgressoTimer);
+    salvarProgressoTimer = setTimeout(salvarProgressoAgora, 700);
+  }
+
+  // Depois de renderizar as perguntas, marca na tela as respostas
+  // recuperadas de um progresso salvo anteriormente.
+  function aplicarProgressoNaTela() {
+    respostasSelecionadas.forEach((r, i) => {
+      if (r === null || r === undefined || r === '') return;
+      const ta = document.getElementById(`aberta-${i}`);
+      if (ta) { ta.value = r; return; }
+      const opcao = document.getElementById(`opcao-${i}-${r}`);
+      if (opcao) {
+        opcao.classList.add('selecionada');
+        const radio = opcao.querySelector('input[type="radio"]');
+        if (radio) radio.checked = true;
+      }
+    });
+    const aviso = document.getElementById('prova-progresso-restaurado');
+    if (aviso) aviso.style.display = 'flex';
+  }
+
   // ── Renderiza as perguntas da prova na tela (múltipla escolha ou
   //    aberta/dissertativa — essa última não é corrigida sozinha) ──
   function renderPerguntas(perguntas) {
@@ -374,6 +419,7 @@
         const i = Number(e.target.id.split('-')[1]);
         respostasSelecionadas[i] = e.target.value;
         document.getElementById('prova-aviso').style.display = 'none';
+        salvarProgressoDebounced();
       });
     });
   }
@@ -383,6 +429,7 @@
     document.querySelectorAll(`[id^="opcao-${perguntaIdx}-"]`).forEach(el => el.classList.remove('selecionada'));
     document.getElementById(`opcao-${perguntaIdx}-${alternativaIdx}`).classList.add('selecionada');
     document.getElementById('prova-aviso').style.display = 'none';
+    salvarProgressoAgora();
   };
 
   // ── PASSO 2: Iniciar avaliação ──
@@ -409,7 +456,28 @@
       respostasSelecionadas = new Array(provaAtiva.perguntas.length).fill(null);
       document.getElementById('prova-titulo-ativo').textContent = provaAtiva.titulo;
       document.getElementById('prova-aviso').style.display = 'none';
+
+      // Recupera progresso salvo (a pessoa já tinha respondido algo antes
+      // de ser bloqueada sem querer e o RH liberou uma nova tentativa)
+      progressoRestaurado = false;
+      try {
+        const progSnap = await getDoc(doc(db, 'provas_em_andamento', chaveColaborador));
+        if (progSnap.exists()) {
+          const prog = progSnap.data();
+          if (prog.provaId === provaAtiva.id && Array.isArray(prog.respostas) && prog.respostas.length === respostasSelecionadas.length) {
+            respostasSelecionadas = prog.respostas;
+            progressoRestaurado = respostasSelecionadas.some(r => r !== null && r !== undefined && r !== '');
+          } else {
+            // progresso salvo é de uma prova diferente da atual — descarta
+            deleteDoc(doc(db, 'provas_em_andamento', chaveColaborador)).catch(() => {});
+          }
+        }
+      } catch(e) {
+        console.error('[ACE] Erro ao verificar progresso salvo:', e);
+      }
+
       renderPerguntas(provaAtiva.perguntas);
+      if (progressoRestaurado) aplicarProgressoNaTela();
     } catch(e) {
       loading(false);
       alert('Erro ao carregar a prova. Verifique sua internet e tente novamente.');
@@ -426,6 +494,10 @@
   //    perguntas abertas não têm correção automática, só ficam
   //    registradas pro RH ler) ──
   window.enviarProva = async function() {
+    // Cancela qualquer autosave de progresso pendente — a prova está
+    // sendo finalizada, não faz sentido regravar o progresso depois.
+    if (salvarProgressoTimer) { clearTimeout(salvarProgressoTimer); salvarProgressoTimer = null; }
+
     const faltando = provaAtiva.perguntas.some((p, i) => {
       const r = respostasSelecionadas[i];
       if (p.tipo === 'aberta') return !r || !String(r).trim();
@@ -470,6 +542,8 @@
         total,
         enviadoEm: new Date().toISOString()
       });
+      // Envio concluído com sucesso — não precisa mais do progresso salvo
+      await deleteDoc(doc(db, 'provas_em_andamento', chaveColaborador)).catch(() => {});
     } catch(e) {
       console.error('[ACE] Erro ao salvar resultado:', e);
     }
@@ -488,6 +562,7 @@
     const nome  = nomeColaborador;
     const chave = chaveColaborador;
     if (!nome) return;
+    salvarProgressoAgora(); // preserva o que já foi respondido antes de bloquear
     avaliacaoAtiva = false;
     setDoc(doc(db, "bloqueados", chave), {
       nome,
