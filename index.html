@@ -173,6 +173,27 @@
 
     .pergunta-nav { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-top: 6px; }
 
+    /* ── Avaliação do curso (pós-prova) ── */
+    .curso-pergunta { font-size: 15.5px; font-weight: 700; color: var(--ink); margin: 22px 0 10px; }
+    .curso-pergunta:first-of-type { margin-top: 4px; }
+    .curso-opcional { font-weight: 400; color: var(--gray); font-size: 13px; }
+    .curso-opcoes { display: flex; flex-direction: column; gap: 10px; }
+    .escala-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+    .escala-num {
+      flex: none; width: 42px; height: 42px; box-sizing: border-box; border-radius: 4px; border: 1.5px solid var(--border);
+      background: #ffffff; color: var(--ink); display: flex; align-items: center; justify-content: center;
+      font-family: 'Archivo', sans-serif; font-stretch: 125%; font-weight: 800; font-size: 14px; cursor: pointer;
+      transition: background .12s ease, border-color .12s ease;
+    }
+    .escala-num:hover { border-color: var(--ink); }
+    .escala-num.selecionada { background: var(--ink); color: #ffffff; border-color: var(--ink); }
+    .escala-legenda { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--gray); margin-top: 6px; max-width: 480px; }
+    textarea.textarea-padrao {
+      box-sizing: border-box; width: 100%; padding: 14px 16px; border: 1.5px solid var(--input-border); border-radius: 4px;
+      background: #ffffff; color: var(--ink); font: inherit; font-size: 14.5px; line-height: 1.6; resize: vertical; outline: none;
+    }
+    textarea.textarea-padrao:focus { border-color: var(--ink); box-shadow: 0 0 0 3px var(--soft); }
+
     /* ── Revisão ── */
     .revisao-lista { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
     .revisao-item { display: grid; grid-template-columns: 44px minmax(0,1fr) auto; gap: 14px; align-items: center; padding: 14px 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
@@ -324,7 +345,39 @@
         </div>
       </div>
 
-      <!-- TELA 5: ENVIADA -->
+      <!-- TELA 5: AVALIAÇÃO DO CURSO (pós-prova) -->
+      <div class="tela" id="secao-avaliacao-curso">
+        <div class="tela-conteudo tela-lg">
+          <div>
+            <h1>Agora, sobre o curso</h1>
+            <div class="sub">Sua opinião ajuda a melhorar os próximos módulos — leva menos de 1 minuto.</div>
+          </div>
+
+          <div class="curso-pergunta">1. O conteúdo das aulas e os materiais de apoio deste mês prepararam você adequadamente para resolver esta prova?</div>
+          <div class="curso-opcoes" id="curso-q1-opcoes">
+            <div class="opcao" data-valor="sim"><span class="opcao-letra">A</span><span class="opcao-texto">Sim, os temas da prova foram bem cobertos nas aulas.</span></div>
+            <div class="opcao" data-valor="parcial"><span class="opcao-letra">B</span><span class="opcao-texto">Parcialmente, algumas questões exigiram conhecimentos não aprofundados.</span></div>
+            <div class="opcao" data-valor="nao"><span class="opcao-letra">C</span><span class="opcao-texto">Não, senti que a prova cobrou assuntos que não foram bem explicados.</span></div>
+          </div>
+
+          <div class="curso-pergunta">2. Em uma escala de 0 a 10, como você avalia a clareza das aulas e a qualidade do material didático disponibilizado neste mês?</div>
+          <div class="escala-wrap" id="curso-q2-escala"></div>
+          <div class="escala-legenda"><span>0 · Muito ruim</span><span>10 · Excelente</span></div>
+
+          <div class="curso-pergunta">3. Se você pudesse sugerir uma única mudança na forma como o conteúdo foi ensinado neste mês, qual seria? <span class="curso-opcional">(opcional)</span></div>
+          <textarea class="textarea-padrao" id="curso-q3-texto" rows="3" placeholder="Sua sugestão…"></textarea>
+
+          <div class="curso-pergunta">4. Pensando no seu dia a dia e nos desafios atuais, qual tema, ferramenta ou habilidade você gostaria de ver abordado no próximo módulo? <span class="curso-opcional">(opcional)</span></div>
+          <textarea class="textarea-padrao" id="curso-q4-texto" rows="3" placeholder="Sua sugestão de tema…"></textarea>
+
+          <div class="erro" id="curso-erro" style="display:none;">Responda as perguntas 1 e 2 antes de continuar.</div>
+          <div class="acoes-espaco">
+            <button class="btn-primario" id="btn-enviar-curso" style="width:100%;">Enviar feedback →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TELA 6: ENVIADA -->
       <div class="tela" id="secao-enviada">
         <div class="tela-conteudo tela-sm">
           <span class="selo-ok">✓</span>
@@ -337,7 +390,7 @@
         </div>
       </div>
 
-      <!-- TELA 6: ENCERRADA -->
+      <!-- TELA 7: ENCERRADA -->
       <div class="tela" id="secao-encerrada">
         <div class="tela-conteudo tela-sm">
           <span class="selo-erro">✕</span>
@@ -377,6 +430,9 @@
   let progressoRestaurado  = false;  // true quando a prova foi recarregada a partir de um progresso salvo
   let salvarProgressoTimer = null;   // debounce do autosave de progresso
   let perguntaIdx          = 0;      // pergunta atual na tela "uma pergunta por vez"
+  let cursoQ1Valor         = null;   // 'sim' | 'parcial' | 'nao' — avaliação do curso (pós-prova)
+  let cursoQ2Valor         = null;   // 0-10
+  let cursoResultadoIdAtual = null;  // id do doc em "resultados" que essa avaliação de curso linka
 
   const REGRAS = [
     ['Objetivo', 'Avaliar o aproveitamento dos cursos realizados no mês pelos colaboradores.'],
@@ -470,6 +526,10 @@
       mapaWrap.style.display = 'flex';
       renderMapaLateral();
       avisoWrap.style.display = 'flex';
+    } else if (telaId === 'secao-avaliacao-curso') {
+      kickerEl.textContent = 'Quase lá';
+      bigEl.textContent = 'Sobre o curso';
+      textoEl.textContent = 'Isso não é sobre sua nota — é sobre o curso em si, pra ajudar o RH a melhorar os próximos módulos.';
     } else if (telaId === 'secao-enviada') {
       kickerEl.textContent = 'Obrigado, ' + primeiroNome;
       bigEl.textContent = 'Até a próxima';
@@ -856,8 +916,9 @@
       };
     });
 
+    let resultadoIdSalvo = null;
     try {
-      await addDoc(collection(db, 'resultados'), {
+      const refResultado = await addDoc(collection(db, 'resultados'), {
         nome: nomeColaborador,
         provaId: provaAtiva.id,
         tituloProva: provaAtiva.titulo,
@@ -866,11 +927,17 @@
         total,
         enviadoEm: new Date().toISOString()
       });
+      resultadoIdSalvo = refResultado.id;
       // Envio concluído com sucesso — não precisa mais do progresso salvo
       await deleteDoc(doc(db, 'provas_em_andamento', chaveColaborador)).catch(() => {});
     } catch(e) {
       console.error('[ACE] Erro ao salvar resultado:', e);
     }
+
+    // A prova já foi enviada e registrada a partir daqui — desliga o
+    // anticola antes de mostrar a avaliação do curso, senão trocar de aba
+    // pra responder com calma acionaria o bloqueio à toa.
+    avaliacaoAtiva = false;
 
     const primeiroNome = (nomeColaborador || '').split(' ')[0] || '';
     const totalPerguntas = provaAtiva.perguntas.length;
@@ -882,7 +949,50 @@
     document.getElementById('enviada-hora').textContent =
       String(agora.getHours()).padStart(2, '0') + ':' + String(agora.getMinutes()).padStart(2, '0');
 
-    avaliacaoAtiva = false;
+    loading(false);
+    mostrarTelaAvaliacaoCurso(resultadoIdSalvo);
+  };
+
+  // ── PASSO 4: Avaliação do curso (pós-prova) — não é sobre a nota, é
+  //    sobre o curso em si (aulas/material). Sempre aparece depois de
+  //    enviar a prova, antes da tela final "Prova enviada". Q1/Q2
+  //    obrigatórias, Q3/Q4 opcionais — exatamente como pedido. ──
+  function mostrarTelaAvaliacaoCurso(resultadoId) {
+    cursoQ1Valor = null;
+    cursoQ2Valor = null;
+    cursoResultadoIdAtual = resultadoId;
+    document.querySelectorAll('#curso-q1-opcoes .opcao').forEach(el => el.classList.remove('selecionada'));
+    document.getElementById('curso-q3-texto').value = '';
+    document.getElementById('curso-q4-texto').value = '';
+    document.getElementById('curso-erro').style.display = 'none';
+    document.getElementById('curso-q2-escala').innerHTML = Array.from({ length: 11 }, (_, n) =>
+      `<button type="button" class="escala-num" data-valor="${n}">${n}</button>`
+    ).join('');
+    mostrarSecao('secao-avaliacao-curso');
+  }
+
+  window.enviarFeedbackCurso = async function() {
+    if (cursoQ1Valor === null || cursoQ2Valor === null) {
+      document.getElementById('curso-erro').style.display = 'block';
+      return;
+    }
+    document.getElementById('curso-erro').style.display = 'none';
+    loading(true, 'Enviando feedback...');
+    try {
+      await addDoc(collection(db, 'avaliacoes_curso'), {
+        nome: nomeColaborador,
+        provaId: provaAtiva.id,
+        tituloProva: provaAtiva.titulo,
+        resultadoId: cursoResultadoIdAtual,
+        q1Alinhamento: cursoQ1Valor,
+        q2Didatica: cursoQ2Valor,
+        q3Melhoria: document.getElementById('curso-q3-texto').value.trim(),
+        q4Tema: document.getElementById('curso-q4-texto').value.trim(),
+        enviadoEm: new Date().toISOString()
+      });
+    } catch(e) {
+      console.error('[ACE] Erro ao salvar avaliação do curso:', e);
+    }
     loading(false);
     mostrarSecao('secao-enviada');
   };
@@ -937,6 +1047,22 @@
   document.getElementById('btn-proxima')    ?.addEventListener('click', () => window.provaProxima());
   document.getElementById('btn-voltar-form')?.addEventListener('click', () => { mostrarSecao('secao-formulario'); renderPerguntaAtual(); });
   document.getElementById('btn-enviar-prova')?.addEventListener('click', () => window.enviarProva());
+
+  document.getElementById('curso-q1-opcoes')?.addEventListener('click', (ev) => {
+    const el = ev.target.closest('.opcao');
+    if (!el) return;
+    cursoQ1Valor = el.dataset.valor;
+    document.querySelectorAll('#curso-q1-opcoes .opcao').forEach(o => o.classList.toggle('selecionada', o === el));
+    if (cursoQ1Valor !== null && cursoQ2Valor !== null) document.getElementById('curso-erro').style.display = 'none';
+  });
+  document.getElementById('curso-q2-escala')?.addEventListener('click', (ev) => {
+    const el = ev.target.closest('.escala-num');
+    if (!el) return;
+    cursoQ2Valor = parseInt(el.dataset.valor, 10);
+    document.querySelectorAll('#curso-q2-escala .escala-num').forEach(o => o.classList.toggle('selecionada', o === el));
+    if (cursoQ1Valor !== null && cursoQ2Valor !== null) document.getElementById('curso-erro').style.display = 'none';
+  });
+  document.getElementById('btn-enviar-curso')?.addEventListener('click', () => window.enviarFeedbackCurso());
 
   document.getElementById('input-nome') ?.addEventListener('keydown', e => {
     if (e.key === 'Enter') window.confirmarNome();
